@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 
 interface DayGrid {
   date: string;
-  weekday: number; // 0=Sun
+  weekday: number;
   closed: boolean;
   slots: Array<{ time: string; taken: boolean; appointmentId?: string }>;
 }
@@ -22,8 +22,6 @@ export default function MonthCalendar({
   const [days, setDays] = useState<DayGrid[]>(initialDays);
   const [error, setError] = useState<string | null>(null);
 
-  // Server-rendered data is shown instantly; this refreshes when the user
-  // navigates to another month (and once on mount to pick up new bookings).
   useEffect(() => {
     let alive = true;
     fetch(`/api/availability?month=${month}`, { cache: "no-store" })
@@ -58,35 +56,35 @@ export default function MonthCalendar({
   const leadBlanks = days.length > 0 ? days[0].weekday : 0;
 
   return (
-    <section className="card p-4 space-y-3">
+    <section className="ticket p-5 space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <h2 className="font-semibold mr-auto">
-          Month view — {monthLabel} <span className="demo-tag ml-1">demo data</span>
+        <h2 className="font-bold mr-auto">
+          {monthLabel} <span className="demo-tag ml-1">demo data</span>
         </h2>
         <button
           onClick={() => shiftMonth(-1)}
           aria-label="Previous month"
-          className="rounded-md border border-[#26282c] px-3 py-1 text-sm hover:bg-[#1b1d20]"
+          className="rounded border border-[#17202b] text-[#17202b] px-3 py-1 text-sm font-semibold hover:bg-[#eceae3]"
         >
           ← Prev
         </button>
         <button
           onClick={() => shiftMonth(1)}
           aria-label="Next month"
-          className="rounded-md border border-[#26282c] px-3 py-1 text-sm hover:bg-[#1b1d20]"
+          className="rounded border border-[#17202b] text-[#17202b] px-3 py-1 text-sm font-semibold hover:bg-[#eceae3]"
         >
           Next →
         </button>
       </div>
 
-      <p className="text-xs text-[#8a8f98]">
+      <p className="text-xs text-[#4a5160]">
         {error ??
-          `${openCount} open slots · green dot = booked, dimmed = open, Sundays closed`}
+          `${openCount} open slots · bold = booked, dimmed = open, Sundays closed`}
       </p>
 
       <div className="grid grid-cols-7 gap-1 text-xs">
         {WEEKDAYS.map((w) => (
-          <div key={w} className="text-center font-semibold text-[#8a8f98] py-1">
+          <div key={w} className="text-center font-semibold text-[#4a5160] py-1 border-b border-[#ddd9cf]">
             {w}
           </div>
         ))}
@@ -99,19 +97,17 @@ export default function MonthCalendar({
             <div
               key={d.date}
               title={
-                d.closed
-                  ? `${d.date} — closed`
-                  : `${d.date} — ${open} open of ${d.slots.length}`
+                d.closed ? `${d.date} — closed` : `${d.date} — ${open} open of ${d.slots.length}`
               }
-              className={`rounded-md border p-1 ${
+              className={`rounded p-1.5 border ${
                 d.closed
-                  ? "border-[#26282c] bg-[#0c0d0e] text-[#4a4e55]"
+                  ? "border-transparent bg-[#eceae3] text-[#9aa0ab]"
                   : open === 0
-                    ? "border-[#26282c] bg-[#1b1d20]"
-                    : "border-[#26282c] bg-[#111214]"
+                    ? "border-[#e8490f]/40 bg-[#fdeee6]"
+                    : "border-[#ddd9cf] bg-white"
               }`}
             >
-              <p className="font-mono">{Number(d.date.slice(8))}</p>
+              <p className="font-mono font-semibold">{Number(d.date.slice(8))}</p>
               {d.closed ? (
                 <p className="text-[9px] mt-1">closed</p>
               ) : (
@@ -119,12 +115,11 @@ export default function MonthCalendar({
                   {d.slots.map((s) => (
                     <p
                       key={s.time}
-                      className={`leading-tight ${
-                        s.taken ? "text-[#c6ff00] font-semibold" : "text-[#5b6068]"
+                      className={`leading-tight font-mono ${
+                        s.taken ? "text-[#e8490f] font-bold" : "text-[#9aa0ab]"
                       }`}
                     >
                       {s.time}
-                      {s.taken && s.appointmentId ? " ●" : ""}
                     </p>
                   ))}
                 </div>

@@ -53,8 +53,12 @@ export function useDashboardFeed(intervalMs = 2000) {
   return { feed, error, refresh };
 }
 
-export function useConversationDetail(id: string, intervalMs = 2000) {
-  const [conversation, setConversation] = useState<ConversationRecord | null>(null);
+export function useConversationDetail(
+  id: string,
+  initial: ConversationRecord | null = null,
+  intervalMs = 2000,
+) {
+  const [conversation, setConversation] = useState<ConversationRecord | null>(initial);
   const [notFound, setNotFound] = useState(false);
 
   useEffect(() => {

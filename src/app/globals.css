@@ -1,57 +1,82 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-ink: #0a0a0a;
-  --color-panel: #111214;
-  --color-line: #26282c;
-  --color-volt: #c6ff00;
-  --color-volt-dim: #9ac400;
+  --color-paper: #f4f2ec;
+  --color-panel: #ffffff;
+  --color-ink: #1e2430;
+  --color-ink-soft: #4a5160;
+  --color-navy: #17202b;
+  --color-line: #ddd9cf;
+  --color-orange: #e8490f;
+  --color-orange-soft: #fdeee6;
+  --color-green: #1f7a3d;
+  --color-green-soft: #e6f4ea;
+  --color-red: #b3261e;
+  --color-red-soft: #fdeceb;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
-  background: var(--color-ink);
-  color: #f5f6f7;
+  background: var(--color-paper);
+  color: var(--color-ink);
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-volt);
+  outline: 2px solid var(--color-orange);
   outline-offset: 2px;
 }
 
-.card {
+/* Work-order ticket: white sheet with a perforated-feel left edge and number */
+.ticket {
   background: var(--color-panel);
-  border: 1px solid var(--color-line);
-  border-radius: 0.75rem;
+  border-left: 4px solid var(--color-orange);
+  box-shadow: 0 1px 2px rgb(23 32 43 / 0.08);
+  border-radius: 4px;
 }
 
-.badge-volt {
-  background: color-mix(in oklab, var(--color-volt) 16%, transparent);
-  color: var(--color-volt);
-  border: 1px solid color-mix(in oklab, var(--color-volt) 45%, transparent);
+/* Clipboard row: hairline-separated list item, no card chrome */
+.clip-row {
+  border-bottom: 1px solid var(--color-line);
 }
+
+/* Status tags — sentence case, filled soft tints */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 9999px;
+  padding: 0.15rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.tag-green { background: var(--color-green-soft); color: var(--color-green); }
+.tag-orange { background: var(--color-orange-soft); color: var(--color-orange); }
+.tag-red { background: var(--color-red-soft); color: var(--color-red); }
+.tag-neutral { background: #eceae3; color: var(--color-ink-soft); }
 
 .demo-tag {
+  font-family: var(--font-geist-mono);
   font-size: 0.65rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #8a8f98;
-  border: 1px dashed #4a4e55;
-  border-radius: 9999px;
+  letter-spacing: 0.04em;
+  color: var(--color-ink-soft);
+  border: 1px dashed #b9b4a8;
+  border-radius: 4px;
   padding: 0.1rem 0.5rem;
 }
 
-@keyframes pulse-bar {
-  0%, 100% { transform: scaleY(0.3); }
+/* Inspection-gauge waveform: ticks like a torque gauge */
+@keyframes gauge-tick {
+  0%, 100% { transform: scaleY(0.25); }
   50% { transform: scaleY(1); }
 }
-
-.waveform-bar {
-  animation: pulse-bar 1s ease-in-out infinite;
-  transform-origin: center;
+.gauge-tick {
+  animation: gauge-tick 0.9s ease-in-out infinite;
+  transform-origin: bottom;
+  background: var(--color-ink);
 }
+.gauge-tick.hot { background: var(--color-orange); }

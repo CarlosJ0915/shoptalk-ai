@@ -28,7 +28,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full flex flex-col">
         <Nav />
         <main className="flex-1 w-full max-w-6xl mx-auto px-4 pb-10">{children}</main>
-        <footer className="border-t border-[#26282c] py-3 text-center text-xs text-[#8a8f98]">
+        <footer className="border-t border-[#ddd9cf] py-3 text-center text-xs text-[#4a5160]">
           ShopTalk AI — hackathon demo · every customer, appointment and price shown is fictional demo data
         </footer>
       </body>
