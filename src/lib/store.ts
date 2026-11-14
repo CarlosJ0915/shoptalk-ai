@@ -52,40 +52,40 @@ interface Store {
 }
 
 function seed(): Store {
-  const store: Store = { appointments: [], conversations: [], seq: 100 };
+  const store: Store = { appointments: [], conversations: [], seq: 0 };
 
-  // Two seeded demo appointments so the schedule isn't empty at demo start.
-  store.appointments.push(
-    {
-      id: "APT-0001",
-      customerName: "Demo Customer A (fictional)",
-      phone: "305-555-0101",
-      vehicle: "2016 Toyota Corolla",
-      issue: "Squealing noise when braking (demo record)",
-      date: isoDay(1),
-      time: "10:00",
-      language: "en",
-      conversationId: "seed-en",
+  // Ten seeded demo appointments across November and December 2026 so the
+  // schedule and month view show a realistic mix. All fictional.
+  const rows: Array<[string, string, string, string, string, Language, string]> = [
+    ["2026-11-16", "10:00", "Demo Customer A (fictional)", "305-555-0101", "2016 Toyota Corolla", "en", "Squealing noise when braking (demo record)"],
+    ["2026-11-17", "13:30", "Cliente Demo B (ficticio)", "786-555-0102", "2019 Honda CR-V", "es", "Cambio de aceite y rotación de neumáticos (registro de demo)"],
+    ["2026-11-19", "08:30", "Demo Customer C (fictional)", "954-555-0143", "2021 Ford F-150", "en", "Check engine light on (demo record)"],
+    ["2026-11-21", "09:00", "Cliente Demo D (ficticio)", "305-555-0144", "2015 Nissan Sentra", "es", "Ruido en la rueda trasera (registro de demo)"],
+    ["2026-11-24", "15:00", "Demo Customer E (fictional)", "786-555-0145", "2018 Chevrolet Malibu", "en", "A/C not cooling (demo record)"],
+    ["2026-12-01", "08:30", "Demo Customer F (fictional)", "305-555-0146", "2020 Toyota Camry", "en", "Oil change due (demo record)"],
+    ["2026-12-03", "13:30", "Cliente Demo G (ficticio)", "954-555-0147", "2017 Jeep Wrangler", "es", "Frenos que chirrían (registro de demo)"],
+    ["2026-12-08", "10:00", "Demo Customer H (fictional)", "786-555-0148", "2019 BMW 328i", "en", "Battery warning light (demo record)"],
+    ["2026-12-12", "09:00", "Cliente Demo I (ficticio)", "305-555-0149", "2014 Mazda 3", "es", "Vibración al frenar (registro de demo)"],
+    ["2026-12-15", "16:30", "Demo Customer J (fictional)", "954-555-0150", "2022 Honda Accord", "en", "Tire pressure warning (demo record)"],
+  ];
+  const now = new Date().toISOString();
+  for (const [date, time, customerName, phone, vehicle, language, issue] of rows) {
+    store.seq += 1;
+    store.appointments.push({
+      id: `APT-${String(store.seq).padStart(4, "0")}`,
+      customerName,
+      phone,
+      vehicle,
+      issue,
+      date,
+      time,
+      language,
+      conversationId: "seed",
       status: "confirmed",
       demoData: true,
-      createdAt: new Date().toISOString(),
-    },
-    {
-      id: "APT-0002",
-      customerName: "Cliente Demo B (ficticio)",
-      phone: "786-555-0102",
-      vehicle: "2019 Honda CR-V",
-      issue: "Cambio de aceite y rotación de neumáticos (registro de demo)",
-      date: isoDay(2),
-      time: "13:30",
-      language: "es",
-      conversationId: "seed-es",
-      status: "confirmed",
-      demoData: true,
-      createdAt: new Date().toISOString(),
-    },
-  );
-  store.seq = 2;
+      createdAt: now,
+    });
+  }
   return store;
 }
 
@@ -137,7 +137,41 @@ export function availableSlots(daysAhead = 7): AvailabilitySlot[] {
   return out;
 }
 
+/** Full slot grid for one month (YYYY-MM): every opening time, booked or not. */
+export function monthSlots(month: string): Array<{
+  date: string;
+  weekday: number; // 0=Sun
+  closed: boolean;
+  slots: Array<{ time: string; taken: boolean; appointmentId?: string }>;
+}> {
+  const [y, m] = month.split("-").map(Number);
+  const daysInMonth = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const appts = db().appointments;
+  const out: ReturnType<typeof monthSlots> = [];
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = `${month}-${String(day).padStart(2, "0")}`;
+    const weekday = new Date(`${date}T12:00:00Z`).getUTCDay();
+    if (weekday === 0) {
+      out.push({ date, weekday, closed: true, slots: [] });
+      continue;
+    }
+    const times = weekday === 6 ? SATURDAY_SLOTS : WEEKDAY_SLOTS;
+    out.push({
+      date,
+      weekday,
+      closed: false,
+      slots: times.map((time) => {
+        const a = appts.find((x) => x.date === date && x.time === time && x.status !== "pending_review");
+        return { time, taken: !!a, appointmentId: a?.id };
+      }),
+    });
+  }
+  return out;
+}
+
 export function getConversation(id: string): ConversationRecord | undefined {
+
+
   return db().conversations.find((c) => c.id === id);
 }
 

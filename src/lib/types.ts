@@ -46,6 +46,7 @@ export interface ConversationRecord {
   phone?: string;
   vehicle?: string;
   issue?: string;
+  preferredTime?: string;
   appointmentId?: string;
   humanFollowUpRequired: boolean;
   followUpReason?: string;

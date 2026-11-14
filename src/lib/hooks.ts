@@ -124,6 +124,24 @@ export function useVoiceCall() {
   // Live conversation id for sendText/pushTurn closures; updated inside start().
   const conversationIdRef = useRef<string | null>(null);
 
+  // Relay an agent tool call to our server API and return the result to the agent.
+  const callTool = useCallback(
+    async (tool: string, parameters: Record<string, unknown>, convId: string | null) => {
+      try {
+        const res = await fetch(`/api/tools/${tool}`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ tool_name: tool, conversation_id: convId, parameters }),
+        });
+        const data = await res.json();
+        return data;
+      } catch {
+        return { error: `${tool} unreachable from the browser` };
+      }
+    },
+    [],
+  );
+
   const sendText = useCallback(
     async (text: string) => {
       const session = sessionRef.current as unknown as { sendUserText?: (t: string) => void } | null;
@@ -178,8 +196,23 @@ export function useVoiceCall() {
           }
         },
         clientTools: {
+          // The agent's four tools execute in the browser against our own API,
+          // so ElevenLabs never needs to reach this machine over the network.
+          check_availability: async (parameters: Record<string, unknown>) =>
+            callTool("check_availability", parameters, conversationIdRef.current),
+          create_appointment: async (parameters: Record<string, unknown>) =>
+            callTool("create_appointment", parameters, conversationIdRef.current),
+          get_estimate: async (parameters: Record<string, unknown>) =>
+            callTool("get_estimate", parameters, conversationIdRef.current),
+          request_human_callback: async (parameters: Record<string, unknown>) =>
+            callTool("request_human_callback", parameters, conversationIdRef.current),
           report_progress: async ({ field, value }: { field: string; value: string }) => {
             setCollected((prev) => ({ ...prev, [field]: value }));
+            void fetch("/api/progress", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ conversation_id: conversationIdRef.current, field, value }),
+            }).catch(() => {});
           },
         },
       });
@@ -188,7 +221,7 @@ export function useVoiceCall() {
       setError(err instanceof Error ? err.message : String(err));
       setStatus("error");
     }
-  }, [pushTurn]);
+  }, [pushTurn, callTool]);
 
   const end = useCallback(async () => {
     await sessionRef.current?.endSession().catch(() => {});

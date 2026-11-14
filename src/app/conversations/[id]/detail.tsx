@@ -59,6 +59,8 @@ export default function ConversationDetail({ id }: { id: string }) {
             <dd>{conversation.vehicle ?? "—"}</dd>
             <dt className="text-[#8a8f98]">Issue (customer words)</dt>
             <dd>{conversation.issue ?? "—"}</dd>
+            <dt className="text-[#8a8f98]">Preferred time</dt>
+            <dd>{conversation.preferredTime ?? "—"}</dd>
             <dt className="text-[#8a8f98]">Started</dt>
             <dd className="font-mono text-xs">{conversation.startedAt}</dd>
           </dl>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useDashboardFeed } from "@/lib/hooks";
+import MonthCalendar from "@/components/MonthCalendar";
 
 export default function SchedulePage() {
   const { feed, error } = useDashboardFeed();
@@ -29,6 +30,9 @@ export default function SchedulePage() {
         </p>
       )}
 
+      <MonthCalendar />
+
+      <h2 className="font-semibold">Booked appointments</h2>
       {days.length === 0 && <p className="text-sm text-[#8a8f98]">No appointments booked yet.</p>}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
