@@ -22,19 +22,28 @@ flowchart LR
     S[/api/session — mints WebRTC token/]
     T[/api/tools/:tool — 4 webhook tools/]
     TR[/api/transcript — live ingest/]
+    P[/api/progress — collected details/]
     A[/api/dashboard, /api/conversations/:id/]
     ST[(In-memory demo store<br/>seeded, deterministic)]
   end
   E[ElevenLabs Conversational AI agent<br/>EN/ES · gemini LLM · ElevenLabs TTS]
 
   C -- WebRTC (token only) --> E
-  E -- webhook tool calls --> T --> ST
+  E -- tool requests --> C
+  C -- browser calls our API --> T
+  T --> ST
   C -- transcript stream --> TR --> ST
+  C -- report_progress --> P --> ST
   C -- start call --> S
   D -- 2s polling --> A --> ST
 ```
 
-## The four agent tools (server-side webhooks)
+## The five agent tools (client-side, executing against our server API)
+
+All five tools are **client tools** registered in the browser. When the agent decides to call
+one, the ElevenLabs SDK hands it to the browser, which fetches `/api/tools/<name>` on our own
+Next.js server. The server processes it and returns the result, which the SDK relays back to the
+agent. This architecture means no webhooks, no tunnels, and no public URLs are needed.
 
 | Tool | What it does | Safety property |
 |------|--------------|-----------------|
@@ -42,6 +51,7 @@ flowchart LR
 | `create_appointment` | Books an appointment | **rejects the call unless `confirmed=true`** — the confirmation gate is enforced in server code, not just the prompt; also rejects missing fields, bad date formats and double-booked slots |
 | `get_estimate` | Returns a fixed demo price range | the agent can never invent a number; unknown categories fall back to "diagnostics", and every response carries a demo-data disclaimer |
 | `request_human_callback` | Flags the conversation for human follow-up | escalation path for price, anger, safety and uncertainty |
+| `report_progress` | Internal UI helper: updates collected-details tiles and persists them to the conversation record | keeps the dashboard's structured view in sync |
 
 Every tool invocation is written to an **audit trail** (timestamp, tool, arguments, result,
 success/blocked) that the dashboard renders per conversation.
@@ -52,6 +62,14 @@ The agent's LLM (Gemini, hosted by ElevenLabs) is instructed to mirror the custo
 every turn and switch instantly mid-conversation; ASR (ElevenLabs Scribe realtime) transcribes
 either language. The detected language is stored per conversation and shown in the UI, and is
 passed to `create_appointment` so the shop knows which language to call back in.
+
+## Text fallback
+
+If microphone access is denied or unavailable, the user can start a **text-only session** using
+the ElevenLabs SDK's `TextConversation.startSession()` with `textOnly: true`. This creates a
+WebRTC session without audio — the agent receives typed text and responds with text. All five
+tools work identically in text mode, the transcript and audit trail are saved the same way, and
+the confirmation gate is enforced by the server exactly as in voice mode.
 
 ## Why this shape
 

@@ -95,16 +95,34 @@ export interface LiveTurn extends TranscriptTurn {
   lang: Language;
 }
 
-export function useVoiceCall() {
+export interface ToolActivityEntry {
+  at: string;
+  tool: string;
+  status: "running" | "ok" | "blocked";
+  summary: string;
+}
+
+export function useCall() {
   const [status, setStatus] = useState<
     "idle" | "connecting" | "listening" | "speaking" | "error" | "ended"
   >("idle");
+  const [mode, setMode] = useState<"voice" | "text">("voice");
   const [error, setError] = useState<string | null>(null);
   const [turns, setTurns] = useState<LiveTurn[]>([]);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [collected, setCollected] = useState<Record<string, string>>({});
-  const sessionRef = useRef<{ endSession: () => Promise<void> } | null>(null);
+  const [activity, setActivity] = useState<ToolActivityEntry[]>([]);
+  // Session holds endSession and optionally sendUserMessage (text mode).
+  const sessionRef = useRef<{
+    endSession: () => Promise<void>;
+    sendUserMessage?: (text: string) => void;
+  } | null>(null);
   const transcriptRef = useRef<TranscriptTurn[]>([]);
+  const conversationIdRef = useRef<string | null>(null);
+
+  const addActivity = useCallback((entry: ToolActivityEntry) => {
+    setActivity((prev) => [...prev, entry]);
+  }, []);
 
   const pushTurn = useCallback(
     (turn: TranscriptTurn, convId: string | null) => {
@@ -121,12 +139,21 @@ export function useVoiceCall() {
     [],
   );
 
-  // Live conversation id for sendText/pushTurn closures; updated inside start().
-  const conversationIdRef = useRef<string | null>(null);
-
   // Relay an agent tool call to our server API and return the result to the agent.
   const callTool = useCallback(
     async (tool: string, parameters: Record<string, unknown>, convId: string | null) => {
+      const toolLabel: Record<string, string> = {
+        check_availability: "Checking calendar",
+        create_appointment: "Creating appointment",
+        get_estimate: "Looking up estimate",
+        request_human_callback: "Requesting human callback",
+      };
+      addActivity({
+        at: new Date().toISOString(),
+        tool,
+        status: "running",
+        summary: toolLabel[tool] ?? tool,
+      });
       try {
         const res = await fetch(`/api/tools/${tool}`, {
           method: "POST",
@@ -134,94 +161,127 @@ export function useVoiceCall() {
           body: JSON.stringify({ tool_name: tool, conversation_id: convId, parameters }),
         });
         const data = await res.json();
+        const ok = res.ok && (data as { result?: { created?: boolean; error?: string } })?.result?.created !== false
+          && !(data as { result?: { error?: string } })?.result?.error;
+        const summary = ok
+          ? tool === "check_availability"
+            ? `${(data as { result?: { open_slots?: unknown[] } })?.result?.open_slots?.length ?? "?"} slots found`
+            : tool === "create_appointment"
+              ? `Appointment ${(data as { result?: { appointment_id?: string } })?.result?.appointment_id ?? ""} created`
+              : tool === "get_estimate"
+                ? `Range $${(data as { result?: { range_low_usd?: number } })?.result?.range_low_usd ?? "?"}–$${(data as { result?: { range_high_usd?: number } })?.result?.range_high_usd ?? "?"}`
+                : "Follow-up requested"
+          : `Blocked: ${(data as { result?: { error?: string } })?.result?.error ?? "failed"}`;
+        addActivity({
+          at: new Date().toISOString(),
+          tool,
+          status: ok ? "ok" : "blocked",
+          summary,
+        });
         return data;
       } catch {
+        addActivity({
+          at: new Date().toISOString(),
+          tool,
+          status: "blocked",
+          summary: `${tool} unreachable from browser`,
+        });
         return { error: `${tool} unreachable from the browser` };
       }
     },
-    [],
+    [addActivity],
   );
 
   const sendText = useCallback(
-    async (text: string) => {
-      const session = sessionRef.current as unknown as { sendUserText?: (t: string) => void } | null;
-      if (!session?.sendUserText) {
-        setError("Text input needs an active voice session.");
+    (text: string) => {
+      const session = sessionRef.current;
+      if (!session?.sendUserMessage) {
+        setError("No active session to send text to.");
         return;
       }
       pushTurn({ speaker: "user", text, at: new Date().toISOString() }, conversationIdRef.current);
-      session.sendUserText(text);
+      session.sendUserMessage(text);
     },
     [pushTurn],
   );
 
-  const start = useCallback(async () => {
-    setStatus("connecting");
-    setError(null);
-    try {
-      const res = await fetch("/api/session");
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        throw new Error(body.error || `session endpoint returned ${res.status}`);
-      }
-      const { token, conversationId: convId, agentId } = (await res.json()) as {
-        token: string;
-        conversationId: string;
-        agentId: string;
-      };
-      setConversationId(convId);
-      conversationIdRef.current = convId;
+  const start = useCallback(
+    async (textOnly: boolean) => {
+      setStatus("connecting");
+      setMode(textOnly ? "text" : "voice");
+      setError(null);
+      try {
+        const res = await fetch("/api/session");
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(body.error || `session endpoint returned ${res.status}`);
+        }
+        const { token, conversationId: convId, agentId } = (await res.json()) as {
+          token: string;
+          conversationId: string;
+          agentId: string;
+        };
+        setConversationId(convId);
+        conversationIdRef.current = convId;
 
-      const { Conversation } = await import("@elevenlabs/client");
-      const session = await Conversation.startSession({
-        agentId,
-        connectionToken: token,
-        onConnect: () => setStatus("listening"),
-        onDisconnect: () => setStatus("ended"),
-        onError: (err) => {
-          setError(String(err));
-          setStatus("error");
-        },
-        onModeChange: ({ mode }) => setStatus(mode === "speaking" ? "speaking" : "listening"),
-        onMessage: (msg) => {
-          if (msg.source === "user" || msg.source === "ai") {
-            pushTurn(
-              {
-                speaker: msg.source === "user" ? "user" : "agent",
-                text: msg.message,
-                at: new Date().toISOString(),
-              },
-              conversationIdRef.current,
-            );
-          }
-        },
-        clientTools: {
-          // The agent's four tools execute in the browser against our own API,
-          // so ElevenLabs never needs to reach this machine over the network.
-          check_availability: async (parameters: Record<string, unknown>) =>
-            callTool("check_availability", parameters, conversationIdRef.current),
-          create_appointment: async (parameters: Record<string, unknown>) =>
-            callTool("create_appointment", parameters, conversationIdRef.current),
-          get_estimate: async (parameters: Record<string, unknown>) =>
-            callTool("get_estimate", parameters, conversationIdRef.current),
-          request_human_callback: async (parameters: Record<string, unknown>) =>
-            callTool("request_human_callback", parameters, conversationIdRef.current),
-          report_progress: async ({ field, value }: { field: string; value: string }) => {
-            setCollected((prev) => ({ ...prev, [field]: value }));
-            void fetch("/api/progress", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ conversation_id: conversationIdRef.current, field, value }),
-            }).catch(() => {});
+        const { Conversation } = await import("@elevenlabs/client");
+        const session = await Conversation.startSession({
+          agentId,
+          connectionToken: token,
+          textOnly,
+          onConnect: () => setStatus("listening"),
+          onDisconnect: () => setStatus("ended"),
+          onError: (err: unknown) => {
+            setError(String(err));
+            setStatus("error");
           },
-        },
-      });
-      sessionRef.current = session as unknown as { endSession: () => Promise<void> };
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setStatus("error");
-    }
-  }, [pushTurn, callTool]);
+          onModeChange: ({ mode: m }: { mode: string }) =>
+            setStatus(m === "speaking" ? "speaking" : "listening"),
+          onMessage: (msg: { source: string; message: string }) => {
+            if (msg.source === "user" || msg.source === "ai") {
+              pushTurn(
+                {
+                  speaker: msg.source === "user" ? "user" : "agent",
+                  text: msg.message,
+                  at: new Date().toISOString(),
+                },
+                conversationIdRef.current,
+              );
+            }
+          },
+          clientTools: {
+            check_availability: async (parameters: Record<string, unknown>) =>
+              callTool("check_availability", parameters, conversationIdRef.current),
+            create_appointment: async (parameters: Record<string, unknown>) =>
+              callTool("create_appointment", parameters, conversationIdRef.current),
+            get_estimate: async (parameters: Record<string, unknown>) =>
+              callTool("get_estimate", parameters, conversationIdRef.current),
+            request_human_callback: async (parameters: Record<string, unknown>) =>
+              callTool("request_human_callback", parameters, conversationIdRef.current),
+            report_progress: async ({ field, value }: { field: string; value: string }) => {
+              setCollected((prev) => ({ ...prev, [field]: value }));
+              addActivity({
+                at: new Date().toISOString(),
+                tool: "report_progress",
+                status: "ok",
+                summary: `Collected ${field}`,
+              });
+              void fetch("/api/progress", {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                body: JSON.stringify({ conversation_id: conversationIdRef.current, field, value }),
+              }).catch(() => {});
+            },
+          },
+        });
+        sessionRef.current = session as unknown as typeof sessionRef.current;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+        setStatus("error");
+      }
+    },
+    [pushTurn, callTool, addActivity],
+  );
 
   const end = useCallback(async () => {
     await sessionRef.current?.endSession().catch(() => {});
@@ -240,5 +300,5 @@ export function useVoiceCall() {
     setStatus("ended");
   }, []);
 
-  return { status, error, turns, conversationId, collected, start, end, sendText };
+  return { status, mode, error, turns, conversationId, collected, activity, start, end, sendText };
 }

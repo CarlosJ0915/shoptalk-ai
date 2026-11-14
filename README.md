@@ -20,11 +20,12 @@ npm run dev
 ```
 
 Open http://localhost:3000 — **Voice Call** to talk to the agent, the dashboard for the staff
-view. Microphone permission is required; a text fallback is offered if it fails.
+view. Microphone permission is required for voice; a text fallback is offered if it fails or if
+you prefer to type.
 
 ## The ElevenLabs agent
 
-The agent configuration lives in `src/lib/agent-config.json` (system prompt, four tools, voice
+The agent configuration lives in `src/lib/agent-config.json` (system prompt, five tools, voice
 settings). To (re)create it on your ElevenLabs account:
 
 ```bash
@@ -33,21 +34,32 @@ npx -y @elevenlabs/cli@latest agents add "ShopTalk AI" --from-file src/lib/agent
 npx -y @elevenlabs/cli@latest agents list   # copy the agent_id into .env.local
 ```
 
-The webhook tools point at `http://localhost:3000/api/tools/<tool>` — the agent calls them only
-while your dev server is running. Edit the URLs in `agent-config.json` before re-pushing if you
-deploy elsewhere.
+## How tools work
+
+All five agent tools are **client tools** — the browser executes them by calling our own
+Next.js API routes, and the server returns the result. ElevenLabs never calls our server
+directly; the tool execution happens entirely in the browser session. This means:
+
+- No tunnels or public URLs needed during the demo
+- Tool calls work in both voice mode and text-only fallback mode
+- The server enforces all business rules (confirmation gate, demo data, audit trail)
+
+The five tools: `check_availability`, `create_appointment`, `get_estimate`,
+`request_human_callback`, plus `report_progress` (a UI helper that updates the collected-details
+display and persists to the conversation record).
 
 ## What's inside
 
 | Path | Purpose |
 |------|---------|
-| `src/app/call` | Voice-call screen: waveform, live bilingual transcript, collected-details tiles, text fallback |
+| `src/app/call` | Voice-call screen: waveform, live bilingual transcript, collected-details tiles, agent activity panel, text fallback |
 | `src/app/page.tsx` | Staff dashboard (live-polled appointments, conversations, follow-up flags) |
-| `src/app/schedule` | Appointment schedule |
+| `src/app/schedule` | Appointment schedule with month-view calendar |
 | `src/app/conversations/[id]` | Transcript + structured details + agent audit trail |
 | `src/app/settings` | Demo-data reference (shop hours, slots, estimate ranges) |
 | `src/app/api/session` | Mints short-lived WebRTC tokens server-side |
-| `src/app/api/tools/[tool]` | The four agent tools: `check_availability`, `create_appointment`, `get_estimate`, `request_human_callback` |
+| `src/app/api/tools/[tool]` | The four business tools: `check_availability`, `create_appointment`, `get_estimate`, `request_human_callback` |
+| `src/app/api/progress` | Persists collected customer details from the agent's `report_progress` calls |
 | `src/lib/store.ts` | In-memory deterministic demo store (seeded fictional data) |
 | `src/lib/tools.ts` | Tool handlers incl. the server-enforced confirmation gate |
 | `tests/appointment.test.ts` | 8 tests: confirmation gating, validation, slot conflicts, estimate bounds |
