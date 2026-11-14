@@ -1,0 +1,8 @@
+{
+    "agents": [
+        {
+            "config": "agent_configs/ShopTalk-AI-Bilingual-Service-Advisor-Demo.json",
+            "id": "agent_3701m7dr4866fykva47hwgwhfy0b"
+        }
+    ]
+}

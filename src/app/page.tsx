@@ -1,69 +1,120 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import Link from "next/link";
+import { useDashboardFeed } from "@/lib/hooks";
+
+function LangTag({ lang }: { lang: string }) {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <span
+      className={
+        lang === "es"
+          ? "badge-volt text-xs px-2 py-0.5 rounded-full"
+          : "text-xs px-2 py-0.5 rounded-full border border-[#4a4e55] text-[#b8bcc4]"
+      }
+    >
+      {lang === "es" ? "ES" : "EN"}
+    </span>
+  );
+}
+
+export default function DashboardPage() {
+  const { feed, error } = useDashboardFeed();
+
+  return (
+    <div className="py-6 space-y-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Staff Dashboard</h1>
+          <p className="text-sm text-[#8a8f98]">
+            Miami Precision Auto · live view <span className="demo-tag ml-1">demo data</span>
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <Link
+          href="/call"
+          className="rounded-lg bg-[#c6ff00] text-black font-semibold px-4 py-2 hover:brightness-110"
+        >
+          Start voice call →
+        </Link>
+      </div>
+
+      {error && (
+        <p role="alert" className="card p-3 text-sm text-red-400 border-red-900">
+          {error}
+        </p>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-[#8a8f98]">Appointments</p>
+          <p className="text-3xl font-bold">{feed?.appointments.length ?? "–"}</p>
         </div>
-      </main>
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-[#8a8f98]">Conversations</p>
+          <p className="text-3xl font-bold">{feed?.conversations.length ?? "–"}</p>
+        </div>
+        <div className="card p-4">
+          <p className="text-xs uppercase tracking-wide text-[#8a8f98]">Needs human follow-up</p>
+          <p className="text-3xl font-bold text-[#c6ff00]">
+            {feed?.conversations.filter((c) => c.humanFollowUpRequired).length ?? "–"}
+          </p>
+        </div>
+      </div>
+
+      <section className="card p-4">
+        <h2 className="font-semibold mb-3">Recent conversations</h2>
+        {feed && feed.conversations.length === 0 && (
+          <p className="text-sm text-[#8a8f98]">No calls yet — start one from the Voice Call screen.</p>
+        )}
+        <ul className="divide-y divide-[#26282c]">
+          {feed?.conversations.map((c) => (
+            <li key={c.id} className="py-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <LangTag lang={c.language} />
+              <span className="text-sm text-[#b8bcc4]">
+                {c.customerName ?? "(collecting details…)"} · {c.vehicle ?? "vehicle TBD"}
+              </span>
+              <span className="text-xs text-[#8a8f98]">
+                {c.turnCount} turns · {c.toolCallCount} tool calls
+              </span>
+              {c.humanFollowUpRequired && (
+                <span className="text-xs rounded-full bg-red-950 text-red-300 border border-red-900 px-2 py-0.5">
+                  follow-up: {c.followUpReason ?? "requested"}
+                </span>
+              )}
+              <Link
+                href={`/conversations/${c.id}`}
+                className="ml-auto text-sm text-[#c6ff00] hover:underline"
+              >
+                transcript &amp; audit →
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="card p-4">
+        <h2 className="font-semibold mb-3">
+          Upcoming appointments <span className="demo-tag ml-1">demo data</span>
+        </h2>
+        <ul className="divide-y divide-[#26282c]">
+          {feed?.appointments.map((a) => (
+            <li
+              key={a.id}
+              className="py-3 grid gap-1 sm:grid-cols-[10rem_1fr_auto] sm:items-center"
+            >
+              <span className="font-mono text-sm text-[#c6ff00]">
+                {a.date} {a.time}
+              </span>
+              <span className="text-sm">
+                <strong>{a.customerName}</strong> · {a.vehicle}
+                <span className="block text-xs text-[#8a8f98]">{a.issue}</span>
+              </span>
+              <span className="text-xs text-[#8a8f98] sm:text-right">
+                {a.id} · {a.language === "es" ? "ES" : "EN"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

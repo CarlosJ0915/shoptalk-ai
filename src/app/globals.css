@@ -1,26 +1,57 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-ink: #0a0a0a;
+  --color-panel: #111214;
+  --color-line: #26282c;
+  --color-volt: #c6ff00;
+  --color-volt-dim: #9ac400;
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+:root {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-ink);
+  color: #f5f6f7;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-volt);
+  outline-offset: 2px;
+}
+
+.card {
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: 0.75rem;
+}
+
+.badge-volt {
+  background: color-mix(in oklab, var(--color-volt) 16%, transparent);
+  color: var(--color-volt);
+  border: 1px solid color-mix(in oklab, var(--color-volt) 45%, transparent);
+}
+
+.demo-tag {
+  font-size: 0.65rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a8f98;
+  border: 1px dashed #4a4e55;
+  border-radius: 9999px;
+  padding: 0.1rem 0.5rem;
+}
+
+@keyframes pulse-bar {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
+.waveform-bar {
+  animation: pulse-bar 1s ease-in-out infinite;
+  transform-origin: center;
 }

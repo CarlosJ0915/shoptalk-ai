@@ -1,9 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // Live demo app: everything is polled at request time, no build-time caching needed.
+  cacheComponents: false,
   turbopack: {
     rules: {
       "*.css": {

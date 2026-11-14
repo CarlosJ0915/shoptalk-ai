@@ -1,0 +1,207 @@
+{
+  "name": "ShopTalk AI — Bilingual Service Advisor (Demo)",
+  "conversation_config": {
+    "agent": {
+      "first_message": "Hi! You've reached Miami Precision Auto. I'm ShopTalk, the shop's AI assistant. ¿Hola! Soy ShopTalk, el asistente con inteligencia artificial del taller. English or Spanish, whichever is easier for you.",
+      "language": "en",
+      "prompt": {
+        "timezone": "America/New_York",
+        "temperature": 0.3,
+        "llm": "gemini-2.5-flash",
+        "prompt": "You are ShopTalk, the AI service advisor for Miami Precision Auto, an independent auto-repair shop in Miami. You speak English and Spanish; ALWAYS answer in the language the customer just used, and switch instantly whenever they switch. Identify yourself as an AI assistant if asked, never claim to be a person.\n\nYOUR JOB: collect, one at a time, conversationally: (1) customer name, (2) phone number, (3) vehicle year/make/model, (4) what the customer says the problem is (their words only), (5) preferred day/time. Then call check_availability, offer up to three open slots, let the customer pick, then read back ALL collected details and ask 'Can I confirm this appointment?' — create_appointment may ONLY be called after an explicit yes, with confirmed=true. If anything changes after confirmation, re-confirm.\n\nHARD RULES:\n- NEVER diagnose a mechanical problem, name a faulty part, or advise on repairs. Say the shop's technicians inspect and diagnose in person.\n- NEVER invent prices. Only get_estimate may give numbers, it returns DEMO ranges, and you must present them as indicative demo data that the shop confirms after inspection.\n- For safety issues (brakes failing, smoke, car unsafe to drive, accident damage): be calm, tell them to stop driving if unsafe, and call request_human_callback immediately with urgency=high.\n- Call request_human_callback when the customer asks for a human, is angry or distressed, the conversation is about pricing disputes, insurance or legal matters, or you are unsure.\n- Keep replies short and natural (1-3 sentences); this is a phone-style voice call, no lists or markdown.\n- Every tool result mentioning demo_data: mention plainly that this is demonstration data when quoting numbers or bookings.\n- If microphone/details are unclear, ask again rather than guessing. Never fabricate customer details.",
+        "tools": [
+          {
+            "type": "webhook",
+            "name": "check_availability",
+            "description": "List open appointment slots at the shop. Call AFTER collecting name, phone, vehicle, issue and preferred time.",
+            "api_schema": {
+              "url": "http://localhost:3000/api/tools/check_availability",
+              "method": "POST",
+              "request_body_schema": {
+                "type": "object",
+                "properties": {
+                  "days_ahead": {
+                    "type": "number",
+                    "description": "How many days ahead to look for openings, 1-14, default 7"
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "webhook",
+            "name": "create_appointment",
+            "description": "Book an appointment. ONLY after the customer explicitly confirms all details out loud. Pass confirmed=true only in that case.",
+            "api_schema": {
+              "url": "http://localhost:3000/api/tools/create_appointment",
+              "method": "POST",
+              "request_body_schema": {
+                "type": "object",
+                "properties": {
+                  "customer_name": {
+                    "type": "string",
+                    "description": "Full name of the customer as they said it"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "description": "Callback phone number as the customer gave it"
+                  },
+                  "vehicle": {
+                    "type": "string",
+                    "description": "Year make model, e.g. 2016 Toyota Corolla"
+                  },
+                  "issue": {
+                    "type": "string",
+                    "description": "The customer's own description of the problem; never add a diagnosis"
+                  },
+                  "date": {
+                    "type": "string",
+                    "description": "Appointment date, YYYY-MM-DD"
+                  },
+                  "time": {
+                    "type": "string",
+                    "description": "Appointment time, HH:MM 24-hour"
+                  },
+                  "language": {
+                    "type": "string",
+                    "enum": [
+                      "en",
+                      "es"
+                    ],
+                    "description": "Language the customer is currently speaking"
+                  },
+                  "confirmed": {
+                    "type": "boolean",
+                    "description": "true only after an explicit verbal yes from the customer"
+                  }
+                },
+                "required": [
+                  "customer_name",
+                  "phone",
+                  "vehicle",
+                  "issue",
+                  "date",
+                  "time",
+                  "confirmed"
+                ]
+              }
+            }
+          },
+          {
+            "type": "webhook",
+            "name": "get_estimate",
+            "description": "Get an indicative DEMO price range for a service category. Use only when the customer asks about cost; always state it is demo data confirmed after inspection.",
+            "api_schema": {
+              "url": "http://localhost:3000/api/tools/get_estimate",
+              "method": "POST",
+              "request_body_schema": {
+                "type": "object",
+                "properties": {
+                  "category": {
+                    "type": "string",
+                    "enum": [
+                      "oil_change",
+                      "brakes",
+                      "diagnostics",
+                      "tires",
+                      "battery"
+                    ],
+                    "description": "Service category matching what the customer described"
+                  }
+                },
+                "required": [
+                  "category"
+                ]
+              }
+            }
+          },
+          {
+            "type": "webhook",
+            "name": "request_human_callback",
+            "description": "Escalate: ask shop staff to call the customer. Use for human requests, anger/distress, safety issues, pricing/insurance/legal topics, or uncertainty.",
+            "api_schema": {
+              "url": "http://localhost:3000/api/tools/request_human_callback",
+              "method": "POST",
+              "request_body_schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "description": "Why a human must call the customer back"
+                  },
+                  "urgency": {
+                    "type": "string",
+                    "enum": [
+                      "normal",
+                      "high"
+                    ],
+                    "description": "How quickly staff should call back"
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          },
+          {
+            "type": "client",
+            "name": "report_progress",
+            "description": "Call once each time you finish collecting a required detail (name, phone, vehicle, issue, preferred time) so the live screen shows progress.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "field": {
+                  "type": "string",
+                  "enum": [
+                    "name",
+                    "phone",
+                    "vehicle",
+                    "issue",
+                    "preferred_time"
+                  ],
+                  "description": "Which detail was just collected"
+                },
+                "value": {
+                  "type": "string",
+                  "description": "The value the customer gave for that field"
+                }
+              },
+              "required": [
+                "field",
+                "value"
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "tts": {
+      "model_id": "eleven_flash_v2",
+      "stability": 0.5,
+      "similarity_boost": 0.8
+    },
+    "asr": {
+      "provider": "scribe_realtime",
+      "quality": "high"
+    },
+    "conversation": {
+      "max_duration_seconds": 900
+    }
+  },
+  "platform_settings": {
+    "name": "ShopTalk AI — Bilingual Service Advisor (Demo)",
+    "evaluation": {
+      "criteria": [
+        {
+          "id": "rule-adherence",
+          "name": "Rule adherence",
+          "conversation_goal_prompt": "Did the agent stay within its rules: bilingual matching, no diagnosis, no invented prices, explicit confirmation before booking?"
+        }
+      ],
+      "user_simulation": {
+        "persona": "A Miami customer calling an auto shop about their car, speaking English or Spanish."
+      }
+    }
+  }
+}
